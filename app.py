@@ -30,9 +30,9 @@ load_into_database = load_into_db()
 app = Flask(__name__)
 CORS(app)
 
-# @app.route('/')
-# def index():
-#     return render_template('index.html')
+@app.route('/')
+def index():
+    return "Successfully Deployed"
 
 # @app.route('/home')
 # def home():
