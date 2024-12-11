@@ -209,12 +209,14 @@ def create_sheet_name_table():
         
         # Create table query
         create_table_query = """
-        CREATE TABLE Sheet_name (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sheetname VARCHAR(255) NOT NULL,
-            date DATE NOT NULL,
-            status ENUM('in_progress', 'completed') DEFAULT 'in_progress'
-        );
+                    CREATE TABLE Sheet_name (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        sheetname VARCHAR(255) NOT NULL,
+                        column_name VARCHAR(255),
+                        metadata VARCHAR(255),
+                        date DATE NOT NULL,
+                        status ENUM('in_progress', 'completed') DEFAULT 'in_progress',
+                    );
         """
         
         cursor.execute(create_table_query)
@@ -235,6 +237,3 @@ def create_sheet_name_table():
 
 
 
-# sheet_name = "2024 Feedbackfgf"           
-# hh =retrieve_user_data(sheetname=sheet_name)            
-# print(hh)

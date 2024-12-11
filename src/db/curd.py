@@ -505,3 +505,91 @@ def get_scatter_data(data):
             connection.close()
         
         return {"error": str(e)}, 500
+    
+
+def get_timeline_data(data):
+    connection = create_connection()
+    cursor = connection.cursor(dictionary=True)
+    santiize_name = sanitize_sheetname(data['table_name'])
+    table_name = f"`{santiize_name}`"
+    node_table = f"`{santiize_name}_nodes`"
+
+    try:
+        query = f"""
+                SELECT 
+                    m.date,
+                    n.node_id,
+                    COUNT(n.node_id) AS frequency
+                FROM 
+                    {node_table} n
+                JOIN 
+                    {table_name} m ON n.feedback_id = m.id
+                GROUP BY 
+                    m.date, n.node_id
+                ORDER BY 
+                    n.node_id
+                LIMIT 0, 1000;
+
+                """  
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # Close cursor and connection
+        cursor.close()
+        connection.close()
+        
+        return results
+    
+    except Exception as e:
+        # Close cursor and connection in case of error
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+        
+        return {"error": str(e)}, 500
+
+
+def get_stakeholder(data):
+    connection = create_connection()
+    cursor = connection.cursor(dictionary=True)
+    metadata = data['meta_data']
+    santiize_name = sanitize_sheetname(data['table_name'])
+    table_name = f"`{santiize_name}`"
+    node_table = f"`{santiize_name}_nodes`"
+    
+    try:
+        query = f"""
+                SELECT 
+                    m.Region, 
+                    m.State, 
+                    m.Stakeholder, 
+                    n.label AS Keyword, 
+                    m.`Feedback/Quotes From Stakeholders` AS ref,
+                    COUNT(m.Stakeholder) AS Count
+                FROM 
+                    {table_name} m
+                JOIN 
+                    {node_table} n ON m.id = n.feedback_id
+                GROUP BY 
+                    m.Region, m.State, m.Stakeholder, n.label,m.`{metadata}`
+                ORDER BY 
+                    m.Region, m.State, m.Stakeholder, n.label,m.`{metadata}`;
+                """  
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # Close cursor and connection
+        cursor.close()
+        connection.close()
+        
+        return results
+    
+    except Exception as e:
+        # Close cursor and connection in case of error
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+        
+        return {"error": str(e)}, 500

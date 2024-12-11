@@ -42,43 +42,46 @@ class load_into_db:
             logging.error(f"Database connection error: {e}")
             raise   
 
-    async def insert_sheet_name_once(self, sheetname):
-        """
-        Insert sheet name only if it doesn't already exist
-        Returns the sheet_name_id
-        """
+    async def insert_sheet_name_once(self, sheetname, metadata, column_name):
+
         try:
+            # Convert column_name list to comma-separated string
+            columns_str = ','.join(str(col) for col in column_name)
+            
             pool = await self.create_db_connection()
             async with pool.acquire() as conn:
                 async with conn.cursor() as cursor:
                     # First, try to get existing sheet name ID
                     check_query = """
                     SELECT id FROM Sheet_name 
-                    WHERE sheetname = %s
+                    WHERE sheetname = %s AND column_name = %s
                     """
-                    await cursor.execute(check_query, (sheetname,))
+                    await cursor.execute(check_query, (sheetname, columns_str))
                     existing_sheet = await cursor.fetchone()
                     
                     if existing_sheet:
-                        # Sheet name already exists, return its ID
+                        # Sheet name and columns already exists, return its ID
                         return existing_sheet[0]
                     
                     # If not exists, insert new sheet name
                     insert_query = """
-                    INSERT INTO Sheet_name (sheetname, date, status) 
-                    VALUES (%s, CURRENT_DATE, 'in_progress')
+                    INSERT INTO Sheet_name (sheetname, column_name, date, status, metadata) 
+                    VALUES (%s, %s, CURRENT_DATE, 'in_progress', %s)
                     """
-                    await cursor.execute(insert_query, (sheetname,))
+                    await cursor.execute(insert_query, (sheetname, columns_str, metadata))
                     
                     # Get the ID of the newly inserted sheet name
                     sheet_name_id = cursor.lastrowid
                     
                     await conn.commit()
                     return sheet_name_id
-
+        
         except Exception as e:
-            logging.error(f"Error inserting sheet name: {e}")
-            raise        
+            # Log the error or handle it appropriately
+            print(f"Error inserting sheet name: {e}")
+            raise
+
+    
     
     async def row_insert_data(self, json_data,sheet_name_id, sanitized_sheetname):
         """Insert data into dynamically created tables, including Sheet_name table"""
@@ -121,7 +124,20 @@ class load_into_db:
                             list_fields = ['Theme', 'Safety', 'Treatment', 'Diagnosis', 
                                         'sentiment', 'AnalyzeThoroughly', 'keywords', 'synonyms', 'Tags']
                             for field in list_fields:
-                                feedback_data[field] = json.dumps(record.get(field, [])) if record.get(field) else None
+
+                                field_data = record.get(field, [])
+
+                                # feedback_data[field] = json.dumps(record.get(field, [])) if record.get(field) else None
+                                # If the field data is a list
+                                if isinstance(field_data, list):
+                                    # If it's a list, join the items with commas for a comma-separated string
+                                    if field_data:
+                                        feedback_data[field] = ",".join(field_data)  # Comma-separated string
+                                    else:
+                                        feedback_data[field] = None # If the list is empty, store as None
+                                else:
+                                    # If it's not a list (just a regular field), store as a JSON string
+                                    feedback_data[field] = json.dumps(field_data) if field_data else None
 
                             feedback_data['Issue'] = record.get('Issue')
                             feedback_data['Stopwords'] = record.get('stopwords')
@@ -201,7 +217,7 @@ class load_into_db:
 
 
 
-    async def load_and_database(self, data_path: str, sheet_name: str):
+    async def load_and_database(self, data_path: str, sheet_name: str, metadata: str,column_name: str):
         try:
   
             # Read input data
@@ -211,16 +227,15 @@ class load_into_db:
             logging.info(f"Loaded {len(data_list)} records")
 
             # Limit to first 2 records for demonstration (remove for full processing)
-            processed_records = data_list[:100]
-
+            processed_records = data_list[:5]
             # # # Process each record
-            for record in processed_records:
+            for record in processed_records[:2]:
                 # Check and create table if not exists
-
-                if not check_table_exists(sheetname=sheet_name):
+                if not check_table_exists(sheetname=sheet_name):      
                     create_tables_dynamically(json_data=record, sheetname=sheet_name)
             
-            sheet_name_id = await self.insert_sheet_name_once(sheet_name)
+            print("start")
+            sheet_name_id = await self.insert_sheet_name_once(sheet_name,metadata=metadata,column_name=column_name)
             sanitized_sheetname = sanitize_sheetname(sheet_name)
                 
             # Stage 2: Parallel Insertion

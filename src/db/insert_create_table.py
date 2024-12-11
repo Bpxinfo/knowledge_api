@@ -42,8 +42,8 @@ def get_sql_type(value):
         except:
             pass
         return "TEXT" if len(value) > 255 else "VARCHAR(255)"
-    elif isinstance(value, (list, dict)):
-        return "JSON"
+    elif isinstance(value, (dict)):
+        return "TEXT"
     else:
         return "TEXT"
 
