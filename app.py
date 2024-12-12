@@ -13,7 +13,7 @@ from src.components.data_ingestion import DataIngestion
 from src.components.data_transformation import DataTransformation
 from src.components.Extract_and_save import Relation_extraction
 from src.db.new_flsk import get_table_names, fetch_data_from_table,get_sheet_names_from_db,fetch_table_data,fetch_edges
-from src.db.curd import  sql_add_node,sql_add_connection,sql_delete_record_nodes,sql_delete_record_edges, merge_edges, merge_nodes_data, merge_multiple_edges, merge_multiple_nodes_data,get_node_by_geo,get_scatter_data,get_timeline_data, get_stakeholder
+from src.db.curd import  sql_add_node,sql_add_connection,sql_delete_record_nodes,sql_delete_record_edges, merge_edges, merge_nodes_data, merge_multiple_edges, merge_multiple_nodes_data,get_node_by_geo,get_scatter_data,get_timeline_data, get_stakeholder,Tree_map
 from src.db.Create_user_upload_sheet import retrieve_user_data,is_sheet_name_table_exists,create_sheet_name_table
 from src.components.load_database import load_into_db
 from src.components.New_clean_json import Extract_clean_json
@@ -338,7 +338,9 @@ def get_node_rankings():
     try:
         # body = {
         #         "table_name":"2024 feedback",
-        #         "metadata": metadata
+        #         "metadata": metadata,
+        #         "State":           column name
+        #         "Stakeholder"
         #     }
         data = request.json
         data = get_node_by_geo(data)
@@ -358,6 +360,7 @@ def get_scatter_plot():
     try:
         # body = {
         #         "table_name":"2024 feedback",
+        #          "State":        column name
         #     }
         data = request.json
         data = get_scatter_data(data)
@@ -376,6 +379,7 @@ def get_timeline():
     try:
         # body = {
         #         "table_name":"2024 feedback",
+        #         "data":                 columns name
         #     }
         data = request.json
         data = get_timeline_data(data)
@@ -394,7 +398,10 @@ def get_Stakeholder_d():
     try:
         # body = {
         #         "table_name":"2024 feedback",
-        #         "metadata": metadata
+        #         "metadata": metadata,
+        #          "state":,
+        #          "Region":,
+        #          "Stakeholder":
         #     }
         data = request.json
         data = get_stakeholder(data)
@@ -407,6 +414,28 @@ def get_Stakeholder_d():
             'error': str(e)
         }), 500
 
+@app.route('/get_Treemap', methods=['GET'])
+def get_Treemap_data():
+    try:
+        # body = {
+        #         "table_name":"2024 feedback",
+        #         "state":,
+        #          "Region":,
+        #          "Stakeholder":
+        #     }
+        data = request.json
+        data = Tree_map(data)
+        return jsonify({
+            'data': data
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
+    
 
+
+    
 if __name__ == '__main__':
     app.run(debug=True)

@@ -244,7 +244,7 @@ class load_into_db:
                 for record in processed_records
             ]
 
-            inserted_records = await asyncio.gather(*insertion_tasks)
+            inserted_records = await asyncio.gather(*insertion_tasks,)
 
 
             logging.info(f"Processed records saved into database")

@@ -327,82 +327,6 @@ def merge_multiple_nodes_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 # Page 3 
 
-# def get_node_by_geo():
-#     # Create database connection
-#         connection = create_connection()
-#         cursor = connection.cursor(dictionary=True)
-        
-#         # Get table names from request or use defaults
-#         nodes_table = "`2024_feedback_nodes`"
-#         metadata_table = "`2024_feedback`"
-#         edges_table ="`2024_feedback_edges`"
-        
-#         # Fetch unique nodes
-#         cursor.execute(f"""
-#             SELECT DISTINCT id, label, type 
-#             FROM {nodes_table}
-#         """)
-#         unique_nodes = cursor.fetchall()
-        
-#         ranked_data = []
-        
-#         # Process each unique node
-#         for node in unique_nodes:
-#             node_id = node['id']
-            
-#             # Get document indices for this node
-#             cursor.execute(f"""
-#                 SELECT DISTINCT id 
-#                 FROM {nodes_table} 
-#                 WHERE id = %s
-#             """, (node_id,))
-#             doc_indices = [row['id'] for row in cursor.fetchall()]
-            
-#             # Get related metadata
-#             cursor.execute(f"""
-#                 SELECT DISTINCT State, stakeholder, Date, `Feedback/Quotes From Stakeholders` 
-#                 FROM {metadata_table} 
-#                 WHERE id IN ({','.join(map(str, doc_indices))})
-#             """)
-#             related_meta = cursor.fetchall()
-            
-#             # Get related edges
-#             cursor.execute(f"""
-#                 SELECT * 
-#                 FROM {edges_table} 
-#                 WHERE source = %s OR target = %s
-#             """, (node_id, node_id))
-#             related_edges = cursor.fetchall()
-            
-#             # Prepare unique geographies and stakeholders
-#             unique_geographies = list(set(meta['State'] for meta in related_meta if meta['State']))
-#             unique_stakeholders = list(set(meta['stakeholder'] for meta in related_meta if meta['stakeholder']))
-            
-#             # Prepare sample references
-#             sample_references = list(set(meta['Feedback/Quotes From Stakeholders'] for meta in related_meta))[:2]
-            
-#             # Get date range
-#             dates = [meta['Date'] for meta in related_meta if meta['Date']]
-            
-#             ranked_data.append({
-#                 'Keyword': node['label'],
-#                 'Total Mentions': len(doc_indices),
-#                 'Type': node['type'],
-#                 'Geographies': ', '.join(unique_geographies),
-#                 'Stakeholders': ', '.join(unique_stakeholders),
-#                 'First Mention': min(dates) if dates else None,
-#                 'Last Mention': max(dates) if dates else None,
-#                 'Sample References': ', '.join(sample_references)
-#             })
-        
-#         # Close database connection
-#         cursor.close()
-#         connection.close()
-        
-        
-#         return ranked_data   
-
-
 
 
 def get_node_by_geo(data):
@@ -565,7 +489,7 @@ def get_stakeholder(data):
                     m.State, 
                     m.Stakeholder, 
                     n.label AS Keyword, 
-                    m.`Feedback/Quotes From Stakeholders` AS ref,
+                    m.`{metadata}` AS ref,
                     COUNT(m.Stakeholder) AS Count
                 FROM 
                     {table_name} m
@@ -575,6 +499,55 @@ def get_stakeholder(data):
                     m.Region, m.State, m.Stakeholder, n.label,m.`{metadata}`
                 ORDER BY 
                     m.Region, m.State, m.Stakeholder, n.label,m.`{metadata}`;
+                """  
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # Close cursor and connection
+        cursor.close()
+        connection.close()
+        
+        return results
+    
+    except Exception as e:
+        # Close cursor and connection in case of error
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+        
+        return {"error": str(e)}, 500
+
+
+def Tree_map(data):
+    connection = create_connection()
+    cursor = connection.cursor(dictionary=True)
+    metadata = data['meta_data']
+    santiize_name = sanitize_sheetname(data['table_name'])
+    table_name = f"`{santiize_name}`"
+    node_table = f"`{santiize_name}_nodes`"
+    
+    try:
+        query = f"""
+               SELECT 
+                    m.State, 
+                    m.Region, 
+                    m.Stakeholder, 
+                    n.node_id, 
+                    n.type,
+                    COUNT(*) AS record_count
+                FROM 
+                    {table_name}  m
+                JOIN 
+                    {node_table} n ON m.id = n.feedback_id
+                GROUP BY 
+                    m.State, 
+                    m.Region, 
+                    m.Stakeholder, 
+                    n.node_id, 
+                    n.type
+                ORDER BY 
+                    record_count DESC;
                 """  
         cursor.execute(query)
         results = cursor.fetchall()
