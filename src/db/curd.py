@@ -566,3 +566,29 @@ def Tree_map(data):
             connection.close()
         
         return {"error": str(e)}, 500
+    
+
+def advance_search(data):
+    connection = create_connection()
+    cursor = connection.cursor(dictionary=True)
+    santiize_name = sanitize_sheetname(data['table_name'])
+    table_name = f"`{santiize_name}`"
+    column_name = data["column_name"]
+    column_name = f"`{column_name}`"
+    search_text = data["search_text"]
+    try:
+        query = f"""
+                SELECT * 
+                FROM {table_name}
+                WHERE {column_name} LIKE %s;
+                """  
+        cursor.execute(query, (f"%{search_text}%",))
+        results = cursor.fetchall()
+        
+        cursor.close()
+        connection.close()
+        
+        return results
+    
+    except Exception as e:
+        return {"error": str(e)}    

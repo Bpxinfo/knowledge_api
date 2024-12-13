@@ -226,7 +226,7 @@ class load_into_db:
             
             logging.info(f"Loaded {len(data_list)} records")
 
-            # Limit to first 2 records for demonstration (remove for full processing)
+            # Limit to records for demonstration (remove for full processing)
             processed_records = data_list[:5]
             # # # Process each record
             for record in processed_records[:2]:

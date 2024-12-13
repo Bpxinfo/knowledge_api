@@ -8,3 +8,4 @@ aiomysql
 python-dotenv
 azure-ai-inference
 mysql-connector-python
+openpyxl
