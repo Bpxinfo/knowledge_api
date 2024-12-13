@@ -17,6 +17,7 @@ def create_connection():
             password = PASSWORD,
             database = DATABASE,
         )
+
 # Function to create the 'user' table
 # def create_user_sheet_table():
 #     conn = create_connection()
@@ -91,26 +92,19 @@ def retrieve_user_data(sheetname):
     conn = create_connection()
     cursor = conn.cursor()
 
-    # SQL query to check if a sheetname exists in the 'user' table
+    # SQL query to check if a sheetname exists in the 'sheet_name' table
     select_query = "SELECT * FROM sheet_name WHERE sheetname = %s"
     cursor.execute(select_query, (sheetname,))
 
     # Fetch the result
     rows = cursor.fetchall()
 
-    # If rows are found, sheetname exists in the table
-    if rows:
-        for row in rows:
-            print(row)  # Optionally, print the row data
-        # Return True if the sheetname is found
-        cursor.close()
-        conn.close()
-        return False
-    else:
-        # Return False if the sheetname is not found
-        cursor.close()
-        conn.close()
-        return True
+    # Close the cursor and connection
+    cursor.close()
+    conn.close()
+
+    # Return True if the sheetname is found, False otherwise
+    return bool(rows)
 
 
 

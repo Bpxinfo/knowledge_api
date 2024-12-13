@@ -110,25 +110,23 @@ def get_column_data():
         if not is_sheet_name_table_exists():
             create_sheet_name_table()
 
-        if retrieve_user_data(sheetname=str(sheet_name)) == "True":
+        if retrieve_user_data(sheetname=str(sheet_name)):
+            return jsonify({'msg':'Sheetname already exists'})
+        
+        feedback_path = obj.initiate_data_ingestion(data=file, sheetname=sheet_name)
+        Transforme_data_path = data_transformation.initiate_Data_transformation(feedback_path,target_columns=metadata,columnsname=column_name)  
+        Clean_json_extraction = clean_json.initiate_json(data_path=Transforme_data_path,target_column=metadata)
 
-            feedback_path = obj.initiate_data_ingestion(data=file, sheetname=sheet_name)
-            Transforme_data_path = data_transformation.initiate_Data_transformation(feedback_path,target_columns=metadata,columnsname=column_name)  
-            Clean_json_extraction = clean_json.initiate_json(data_path=Transforme_data_path,target_column=metadata)
+        extracted_records = asyncio.run(extract_all.load_and_extract(
+            data_path=Clean_json_extraction,
+            target_column=metadata,)
+        )
+        load_data = asyncio.run(load_into_database.load_and_database(
+            data_path=extracted_records, 
+            sheet_name=sheet_name,
+        ))
 
-            extracted_records = asyncio.run(extract_all.load_and_extract(
-                data_path=Clean_json_extraction,
-                target_column=metadata,)
-            )
-            load_data = asyncio.run(load_into_database.load_and_database(
-                data_path=extracted_records, 
-                sheet_name=sheet_name,
-            ))
-
-            return jsonify({'msg':"Succesfully created and insert data"})
-    
-        else:
-            return jsonify({'msg':'Sheetname already exist'})
+        return jsonify({'msg':"Succesfully created and insert data"})
 
         # return jsonify({'feedback_path': feedback_path})
 
