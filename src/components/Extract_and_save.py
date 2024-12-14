@@ -94,8 +94,11 @@ class Relation_extraction:
 
             return updated_record
         except Exception as e:
-            logging.error(f"Error in record extraction or database insert: {e}")
-            return record # If we don't want empty list of extracted record remove return
+            # logging.error(f"Error in record extraction or database insert: {e}")
+            # return record # If we don't want empty list of extracted record remove return
+            error_message = f"Error in record extraction: {str(e)}"
+            logging.error(error_message)
+            return {"error": error_message}
 
     async def load_and_extract(self, data_path: str, target_column: str, batch_size: int = 50):
         try:
@@ -167,7 +170,7 @@ class Relation_extraction:
                         f"Successful: {total_successful}, "
                         f"Failed: {total_failed}")
 
-            return results
+            return self.relation_file_path
 
         except Exception as e:
             logging.error(f"Load and extract error: {e}")
