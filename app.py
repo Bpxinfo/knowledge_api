@@ -12,11 +12,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 from src.components.data_ingestion import DataIngestion
 from src.components.data_transformation import DataTransformation
 from src.components.Extract_and_save import Relation_extraction
-from src.db.new_flsk import get_table_names, fetch_data_from_table,get_sheet_names_from_db,fetch_table_data,fetch_edges
-from src.db.curd import  sql_add_node,sql_add_connection,sql_delete_record_nodes,sql_delete_record_edges, merge_edges, merge_nodes_data, merge_multiple_edges, merge_multiple_nodes_data,get_node_by_geo,get_scatter_data,get_timeline_data, get_stakeholder,Tree_map, advance_search
-from src.db.Create_user_upload_sheet import retrieve_user_data,is_sheet_name_table_exists,create_sheet_name_table
 from src.components.load_database import load_into_db
 from src.components.New_clean_json import Extract_clean_json
+
+from src.db.table_data_fetch import get_table_names, fetch_data_from_table,get_sheet_names_from_db,fetch_table_data,fetch_edges
+from src.db.curd import  sql_add_node,sql_add_connection,sql_delete_record_nodes,sql_delete_record_edges, merge_edges, merge_nodes_data, merge_multiple_edges, merge_multiple_nodes_data
+from src.db.Othergraph_data_fetch import get_node_by_geo,get_scatter_data,get_timeline_data, get_stakeholder,Tree_map, advance_search,get_treatment,get_safety,get_diagnosis
+from src.db.Create_user_upload_sheet import retrieve_user_data,is_sheet_name_table_exists,create_sheet_name_table
+
 
 obj = DataIngestion()
 data_transformation= DataTransformation()
@@ -24,6 +27,13 @@ extract_all = Relation_extraction()
 clean_json = Extract_clean_json()
 load_into_database = load_into_db()
 # analyzer = GraphAnalyzer()
+
+source_cal ={
+    "col_Date":"Date",
+    "State":"State",
+    "Region":"Region",
+    "Stakeholder":"Stakeholder"
+    }
 
 app = Flask(__name__)
 CORS(app)
@@ -124,6 +134,8 @@ def get_column_data():
         load_data = asyncio.run(load_into_database.load_and_database(
             data_path=extracted_records, 
             sheet_name=sheet_name,
+            metadata= metadata,
+            source_col=source_cal
         ))
 
         return jsonify({'msg':"Succesfully created and insert data"})
@@ -182,7 +194,7 @@ def get_data():
 
 
 
-# API route to fetch data
+# API route to fetch data ----
 @app.route('/fetch-data', methods=['POST'])
 def fetch_data():
     try:
@@ -210,7 +222,7 @@ def fetch_data():
         return jsonify({'error': f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# Get knowledge graph data
+# Get knowledge graph data ----
 @app.route('/fatch_edges', methods = ['POST'])
 def get_edges():
     try:
@@ -237,7 +249,7 @@ def get_edges():
     
 
 
-# Add New Node API(from frontend get table_name,node_id,feedback_id,label,type)
+# Add New Node API(from frontend get table_name,node_id,feedback_id,label,type) ----
 @app.route('/add_node', methods=['POST'])
 def add_node():
     data = request.json 
@@ -248,7 +260,7 @@ def add_node():
         return jsonify({"error": str(e)}), 500
 
 
-#Add connection btn nodes(add connection in edges table)
+#Add connection btn nodes(add connection in edges table) ----
 @app.route('/add_connection', methods=['POST'])
 def add_connection():
     data = request.json
@@ -260,7 +272,7 @@ def add_connection():
         return jsonify({"error": str(e)}), 500
 
 
-#Merge Two node(from two table first take edge table and than node table)
+#Merge Two node(from two table first take edge table and than node table) ----
 @app.route('/merge_nodes', methods=['PUT'])
 def merge_nodes():
     data = request.json
@@ -452,6 +464,61 @@ def search_feedback():
         return jsonify({
             'error': str(e)
         }), 500   
+
+@app.route('/treatment_heatmap', methods=['POST'])
+def generate_treatment_heatmap():
+    try:
+        # body={
+        #     "table_name":""
+        # }
+        # Receive JSON data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Create DataFrame
+        heatmap_json = get_treatment(data)
+        return jsonify({"heatmap": heatmap_json})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     
+@app.route('/safety_heatmap', methods=['POST'])
+def generate_safety_heatmap():
+    try:
+        # body={
+        #     "table_name":""
+        # }
+        # Receive JSON data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Create DataFrame
+        heatmap_json = get_safety(data)
+        return jsonify({"heatmap": heatmap_json})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500    
+    
+@app.route('/diagnosis_heatmap', methods=['POST'])
+def generate_diagnosis_heatmap():
+    try:
+        # body={
+        #     "table_name":""
+        # }
+        # Receive JSON data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Create DataFrame
+        heatmap_json = get_diagnosis(data)
+        return jsonify({"heatmap": heatmap_json})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500  
+
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -7,9 +7,10 @@ import os
 from dotenv import load_dotenv
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','..')))
+from src.utils import sanitize_sheetname
 from src.exception import CustomException
 from src.logger import logging
-
+import re
 load_dotenv()
 
 HOST= os.getenv('host')
@@ -17,6 +18,8 @@ HOST= os.getenv('host')
 USER = os.getenv('user')
 PASSWORD = os.getenv('password')
 DATABASE = os.getenv('database')
+
+
 
 
 def create_connection():
@@ -130,12 +133,7 @@ def get_sheet_names_from_db():
             connection.close()           
 
 
-import re
 
-def sanitize_sheetname(sheetname):
-    """Sanitize the sheet name to make it a valid MySQL table name."""
-    sanitized = re.sub(r'\W+', '_', sheetname)  # Replace non-word characters with underscores
-    return sanitized.lower().strip('_') 
 
 # Function to fetch data from the database
 def fetch_table_data(sheet_name, id_value):
@@ -145,11 +143,11 @@ def fetch_table_data(sheet_name, id_value):
         cursor = connection.cursor(dictionary=True)
         table_name = sanitize_sheetname(sheetname=sheet_name)
         # Query the table
-        # query = f"SELECT * FROM {table_name} WHERE sheet_name_id = %s"
-        query = f"SELECT * FROM {table_name}"
+        query = f"SELECT * FROM {table_name} WHERE sheet_name_id = %s"
+        # query = f"SELECT * FROM {table_name}"
 
-        # cursor.execute(query, (id_value,))
-        cursor.execute(query,)
+        cursor.execute(query, (id_value,))
+        # cursor.execute(query,)
 
         result = cursor.fetchall()
         

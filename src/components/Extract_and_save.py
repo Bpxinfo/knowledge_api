@@ -4,7 +4,7 @@ import json
 import asyncio
 import logging
 import aiohttp
-import aiomysql
+
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -18,14 +18,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','..'
 from src.exception import CustomException
 from src.logger import logging
 from src.utils import extract_medical_lists
-from src.db.insert_create_table import row_insert_data, check_table_exists, create_tables_dynamically
 from src.model.new_prompt import system_prompt
-from src.db.insert_create_table import get_sql_type,create_table,sanitize_sheetname
-# Load environment variables
+
 load_dotenv()
 KEY = os.getenv("key")
 ENDPOINT = os.getenv("endpoint")
-# Configure logging
+
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -97,81 +95,83 @@ class Relation_extraction:
             return updated_record
         except Exception as e:
             logging.error(f"Error in record extraction or database insert: {e}")
-            # Return original record if extraction fails
-            return record
+            return record # If we don't want empty list of extracted record remove return
 
-    async def load_and_extract(self, data_path: str, target_column: str):
+    async def load_and_extract(self, data_path: str, target_column: str, batch_size: int = 50):
         try:
-
             # Read input data
             with open(data_path, 'r', encoding='utf-8') as json_file:
                 data_list = json.load(json_file)
             
-            logging.info(f"Loaded {len(data_list)} records")
-
-            # Limit to first 2 records for demonstration (remove for full processing)
             data_list = data_list[:10]
+            total_records = len(data_list)
+            logging.info(f"Loaded {total_records} records")
 
-            # Process records concurrently
-            tasks = [
-                self.extract_record(record, target_column, system_prompt) 
-                for record in data_list
-            ]
-            processed_records = await asyncio.gather(*tasks)
+            # Handle case when batch_size is greater than total records
+            batch_size = min(batch_size, total_records)
+
+            # Initialize list to store all processed records
+            all_processed_records = []
+            total_successful = 0
+            total_failed = 0
+            failed_records = []
+
+            for i in range(0, total_records, batch_size):
+                # Get the current batch of records
+                batch = data_list[i:i+batch_size]
+                
+                logging.info(f"Processing batch {i//batch_size + 1}: {len(batch)} records")
+
+                # Process records in the current batch concurrently
+                tasks = [
+                    self.extract_record(record, target_column, system_prompt) 
+                    for record in batch
+                ]
+
+                # Use return_exceptions to handle individual task failures
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Process batch results
+                for original_record, result in zip(batch, batch_results):
+                    if isinstance(result, Exception):
+                        failed_records.append({
+                            'record': original_record,
+                            'error': str(result)
+                        })
+                        total_failed += 1
+                        logging.error(f"Failed to extract record: {result}")
+                    else:
+                        # Successful extraction
+                        all_processed_records.append(result)
+                        total_successful += 1
+
+                # Optional: Add a small delay between batches to avoid rate limiting
+                await asyncio.sleep(1)
 
             # Save processed records to JSON
             with open(self.relation_file_path, 'w', encoding='utf-8') as f:
-                json.dump(processed_records, f, indent=2)
+                json.dump(all_processed_records, f, indent=2)
 
-            logging.info(f"Processed records saved to {self.relation_file_path}")
-            return self.relation_file_path
+            # Prepare results dictionary
+            results = {
+                'total_records': total_records,
+                'processed_records': all_processed_records,
+                'failed_records': failed_records,
+                'total_successful': total_successful,
+                'total_failed': total_failed,
+                'output_file': self.relation_file_path
+            }
+
+            logging.info(f"Batch extraction complete. "
+                        f"Total Records: {total_records}, "
+                        f"Successful: {total_successful}, "
+                        f"Failed: {total_failed}")
+
+            return results
 
         except Exception as e:
             logging.error(f"Load and extract error: {e}")
             raise
-
-
-    # async def load_and_extract(self, data_path: str, target_column: str):
-    #     try:
-    #         # Read input data
-    #         with open(data_path, 'r', encoding='utf-8') as json_file:
-    #             data_list = json.load(json_file)
-            
-    #         logging.info(f"Loaded {len(data_list)} records")
-
-    #         # Initialize list to store all processed records
-    #         all_processed_records = []
-
-    #         # Process records in batches of 50
-    #         for i in range(0, len(data_list), 50):
-    #             # Get the current batch of 50 records (or remaining records if less than 50)
-    #             batch = data_list[i:i+50]
-                
-    #             logging.info(f"Processing batch {i//50 + 1}: {len(batch)} records")
-
-    #             # Process records in the current batch concurrently
-    #             tasks = [
-    #                 self.extract_record(record, target_column, system_prompt) 
-    #                 for record in batch
-    #             ]
-    #             processed_batch = await asyncio.gather(*tasks)
-
-    #             # Extend the all_processed_records list
-    #             all_processed_records.extend(processed_batch)
-
-    #             # Optional: Add a small delay between batches to avoid rate limiting
-    #             await asyncio.sleep(1)
-
-    #         # Save processed records to JSON
-    #         with open(self.relation_file_path, 'w', encoding='utf-8') as f:
-    #             json.dump(all_processed_records, f, indent=2)
-
-    #         logging.info(f"Processed {len(all_processed_records)} records saved to {self.relation_file_path}")
-    #         return self.relation_file_path
-
-    #     except Exception as e:
-    #         logging.error(f"Load and extract error: {e}")
-    #         raise    
 
 # async def main():
 #     # Get credentials from environment

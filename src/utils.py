@@ -12,7 +12,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
 stop_words = set(stopwords.words('english'))
 import pandas as pd
-
+from dateutil.parser import parse
 
 import json
 from datetime import datetime
@@ -65,13 +65,13 @@ def extract_source_target(data):
 
     return sources, targets
 
-def find_json_data(text):
-    # Search for the first '[' and the last ']'
-    match = re.search(r'\[.*\]', text, re.DOTALL)
+# def find_json_data(text):
+#     # Search for the first '[' and the last ']'
+#     match = re.search(r'\[.*\]', text, re.DOTALL)
 
-    if match:
-        return match.group(0)
-    return None
+#     if match:
+#         return match.group(0)
+#     return None
 
 
 
@@ -192,3 +192,29 @@ def extract_medical_lists(text):
     }
     
     return medical_lists
+
+
+def sanitize_sheetname(sheetname):
+    """Sanitize the sheet name to make it a valid MySQL table name."""
+    sanitized = re.sub(r'\W+', '_', sheetname)  # Replace non-word characters with underscores
+    return sanitized.lower().strip('_')  # Convert to lowercase and trim leading/trailing underscores
+
+
+def get_sql_type(value):
+    """Map Python data types to MySQL data types."""
+    if isinstance(value, int):
+        return "INT"
+    elif isinstance(value, float):
+        return "FLOAT"
+    elif isinstance(value, str):
+        # Determine if the string is a DATE
+        try:
+            parse(value)
+            return "DATETIME"
+        except:
+            pass
+        return "TEXT" if len(value) > 255 else "VARCHAR(255)"
+    elif isinstance(value, (dict)):
+        return "TEXT"
+    else:
+        return "TEXT"

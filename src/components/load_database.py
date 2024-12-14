@@ -5,7 +5,6 @@ import asyncio
 import logging
 import aiohttp
 import aiomysql
-import pandas as pd
 from dotenv import load_dotenv
 
 # Ensure these are imported correctly from your project structure
@@ -13,11 +12,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','..'
 from src.exception import CustomException
 from src.logger import logging
 from src.db.insert_create_table import check_table_exists, create_tables_dynamically
-from src.db.insert_create_table import get_sql_type,sanitize_sheetname
+from src.db.insert_create_table import sanitize_sheetname
 # Load environment variables
 load_dotenv()
-
-
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -42,21 +39,33 @@ class load_into_db:
             logging.error(f"Database connection error: {e}")
             raise   
 
-    async def insert_sheet_name_once(self, sheetname, metadata, column_name):
-
+    async def insert_sheet_name_once(self, sheetname, metadata, source_column):
+        """
+        Insert sheet name only if it doesn't already exist
+        Returns the sheet_name_id
+        
+        Args:
+            sheetname (str): Name of the sheet
+            metadata (str): Metadata string
+            column_name (list): List of column names
+        """
         try:
             # Convert column_name list to comma-separated string
-            columns_str = ','.join(str(col) for col in column_name)
-            
+            # columns_str = ','.join(str(col) for col in column_name)
+            State = source_column['State']
+            Stakeholder = source_column['Stakeholder']
+            Date = source_column['col_Date']
+            Region = source_column['Region']
+
             pool = await self.create_db_connection()
             async with pool.acquire() as conn:
                 async with conn.cursor() as cursor:
                     # First, try to get existing sheet name ID
                     check_query = """
                     SELECT id FROM Sheet_name 
-                    WHERE sheetname = %s AND column_name = %s
+                    WHERE sheetname = %s
                     """
-                    await cursor.execute(check_query, (sheetname, columns_str))
+                    await cursor.execute(check_query, (sheetname))
                     existing_sheet = await cursor.fetchone()
                     
                     if existing_sheet:
@@ -65,10 +74,10 @@ class load_into_db:
                     
                     # If not exists, insert new sheet name
                     insert_query = """
-                    INSERT INTO Sheet_name (sheetname, column_name, date, status, metadata) 
-                    VALUES (%s, %s, CURRENT_DATE, 'in_progress', %s)
+                    INSERT INTO Sheet_name (sheetname, date, status, metadata, State, Stakeholder, col_Date, Region) 
+                    VALUES (%s, CURRENT_DATE, 'in_progress', %s, %s, %s, %s, %s)
                     """
-                    await cursor.execute(insert_query, (sheetname, columns_str, metadata))
+                    await cursor.execute(insert_query, (sheetname, metadata, State, Stakeholder, Date, Region))
                     
                     # Get the ID of the newly inserted sheet name
                     sheet_name_id = cursor.lastrowid
@@ -128,15 +137,15 @@ class load_into_db:
                                 field_data = record.get(field, [])
 
                                 # feedback_data[field] = json.dumps(record.get(field, [])) if record.get(field) else None
-                                # If the field data is a list
+                                # process list and dict
                                 if isinstance(field_data, list):
                                     # If it's a list, join the items with commas for a comma-separated string
                                     if field_data:
-                                        feedback_data[field] = ",".join(field_data)  # Comma-separated string
+                                        feedback_data[field] = ",".join(field_data)  
                                     else:
                                         feedback_data[field] = None # If the list is empty, store as None
                                 else:
-                                    # If it's not a list (just a regular field), store as a JSON string
+                                    # If it's not a list, store as a JSON string
                                     feedback_data[field] = json.dumps(field_data) if field_data else None
 
                             feedback_data['Issue'] = record.get('Issue')
@@ -217,41 +226,86 @@ class load_into_db:
 
 
 
-    async def load_and_database(self, data_path: str, sheet_name: str, metadata: str,column_name: str):
+    async def load_and_database(self, data_path: str, sheet_name: str, metadata: str, source_col, batch_size: int = 50):
         try:
   
             # Read input data
             with open(data_path, 'r', encoding='utf-8') as json_file:
                 data_list = json.load(json_file)
-            
-            logging.info(f"Loaded {len(data_list)} records")
 
-            # Limit to records for demonstration (remove for full processing)
-            processed_records = data_list[:5]
-            # # # Process each record
-            for record in processed_records[:2]:
-                # Check and create table if not exists
-                if not check_table_exists(sheetname=sheet_name):      
-                    create_tables_dynamically(json_data=record, sheetname=sheet_name)
+            data_list = data_list[:10]
+            total_records = len(data_list)
+            logging.info(f"Loaded {total_records} records")
+
+            # Handle case when batch_size is greater than total records
+            batch_size = min(batch_size, total_records)
+       
+            # Check and create table if not exists
+            if not check_table_exists(sheetname=sheet_name):      
+                create_tables_dynamically(json_data=data_list[0], sheetname=sheet_name)
             
-            print("start")
-            sheet_name_id = await self.insert_sheet_name_once(sheet_name,metadata=metadata,column_name=column_name)
+            # Insert sheet name once
+            sheet_name_id = await self.insert_sheet_name_once(sheet_name, metadata=metadata, source_column=source_col)
             sanitized_sheetname = sanitize_sheetname(sheet_name)
+
+            # Tracking variables
+            processed_records = []
+            failed_records = []
+            total_successful = 0
+            total_failed = 0
+
+            for i in range(0, total_records, batch_size):
+
+                batch = data_list[i:i+batch_size]
                 
-            # Stage 2: Parallel Insertion
-            insertion_tasks = [
-                self.insert_record( record,sheet_name_id,sanitized_sheetname)
-                for record in processed_records
-            ]
+                logging.info(f"Processing batch {i//batch_size + 1}: Records {i} to {min(i+batch_size, total_records)}")
+                
+                # Create batch insertion tasks
+                insertion_tasks = [
+                    self.insert_record(record, sheet_name_id, sanitized_sheetname)
+                    for record in batch
+                ]
 
-            inserted_records = await asyncio.gather(*insertion_tasks,)
+                # Use return_exceptions=True to catch and process individual task exceptions
+                batch_results = await asyncio.gather(*insertion_tasks, return_exceptions=True)
 
+                # Process batch results
+                for record, result in zip(batch, batch_results):
+                    if isinstance(result, Exception):
+                        # Record failed insertion
+                        failed_records.append({
+                            'record': record,
+                            'error': str(result)
+                        })
+                        total_failed += 1
+                        logging.error(f"Failed to insert record: {result}")
+                    elif result is not None:
+                        # Successful insertion
+                        processed_records.append(result)
+                        total_successful += 1
 
-            logging.info(f"Processed records saved into database")
-            return processed_records
+                # Optional: Log batch progress
+                logging.info(f"Batch {i//batch_size + 1} completed. " 
+                            f"Successful: {total_successful}, Failed: {total_failed}")
+
+                # Prepare and return comprehensive results
+                results = {
+                    'total_records': total_records,
+                    'processed_records': processed_records,
+                    'failed_records': failed_records,
+                    'total_successful': total_successful,
+                    'total_failed': total_failed
+                }
+
+                logging.info(f"Batch processing complete. "
+                            f"Total Records: {total_records}, "
+                            f"Successful: {total_successful}, "
+                            f"Failed: {total_failed}")
+
+                return results
 
         except Exception as e:
-            logging.error(f"Load and extract error: {e}")
+            logging.error(f"Batch processing error: {e}")
             raise
 
 # async def main():
@@ -259,8 +313,14 @@ class load_into_db:
 #     # Configuration
 #     data_path = r"C:\Users\nickc\OneDrive\Desktop\New folder (2)\Backend\artifact\Relation.json"
 #     target_column = "Feedback/Quotes From Stakeholders"
-#     sheet_name = "kitna bakbas he"
-
+#     sheet_name = "demo table"
+#     source_cal ={
+#     "col_Date":"Date",
+#     "State":"State",
+#     "Region":"Region",
+#     "Stakeholder":"Stakeholder"
+#         }
+    
 #     # Initialize and run extraction
 #     extractor = load_into_db()
     
@@ -268,6 +328,8 @@ class load_into_db:
 #     processed_records = await extractor.load_and_database(
 #         data_path=data_path, 
 #         sheet_name=sheet_name,
+#         source_col=source_cal,
+#         metadata=target_column
 #     )
     
 
