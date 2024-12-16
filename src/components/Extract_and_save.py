@@ -17,7 +17,7 @@ from dataclasses import dataclass
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','..')))
 from src.exception import CustomException
 from src.logger import logging
-from src.utils import extract_medical_lists
+from src.utils import extract_medical_lists, sanitize_column_name
 from src.model.new_prompt import system_prompt
 
 load_dotenv()
@@ -73,6 +73,7 @@ class Relation_extraction:
 
     async def extract_record(self, record: dict, target_column: str, system_prompt: str):
         try:
+            target_column = sanitize_column_name(target_column)
             text = record.get(target_column, "")
             
             # Log the text being processed

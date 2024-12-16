@@ -218,3 +218,28 @@ def get_sql_type(value):
         return "TEXT"
     else:
         return "TEXT"
+    
+
+def sanitize_column_name(column_name):
+        """
+        Sanitize column names to make them SQL and JSON-friendly:
+        - Remove special characters
+        - Replace spaces with underscores
+        - Ensure the name starts with a letter
+        - Convert to lowercase for consistency
+        """
+        # Convert to string in case of non-string input
+        column_name = str(column_name)
+        
+        # Remove or replace special characters
+        sanitized = ''.join(c if c.isalnum() or c == '_' else '_' for c in column_name)
+        
+        # Ensure the name starts with a letter
+        if not sanitized[0].isalpha():
+            sanitized = 'col_' + sanitized
+        
+        # Convert to lowercase
+        sanitized = sanitized.lower()
+        
+        # Truncate to a reasonable length if needed
+        return sanitized[:64]    

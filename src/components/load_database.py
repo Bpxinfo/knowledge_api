@@ -14,6 +14,7 @@ from src.exception import CustomException
 from src.logger import logging
 from src.db.insert_create_table import check_table_exists, create_tables_dynamically
 from src.db.insert_create_table import get_sql_type,sanitize_sheetname
+from src.utils import sanitize_column_name
 # Load environment variables
 load_dotenv()
 
@@ -55,10 +56,10 @@ class load_into_db:
         try:
             # Convert column_name list to comma-separated string
             # columns_str = ','.join(str(col) for col in column_name)
-            State = source_column['State']
-            Stakeholder = source_column['Stakeholder']
-            Date = source_column['col_Date']
-            Region = source_column['Region']
+            State = sanitize_column_name(source_column['State'])
+            Stakeholder = sanitize_column_name(source_column['Stakeholder'])
+            Date = sanitize_column_name(source_column['col_Date'])
+            Region = sanitize_column_name(source_column['Region'])
 
             pool = await self.create_db_connection()
             async with pool.acquire() as conn:
@@ -247,7 +248,7 @@ class load_into_db:
 
             # if not isinstance(data_list, list):
             #     raise ValueError("Loaded data is not a list.")
-
+            metadata = sanitize_column_name(metadata)
             data_list = data_list[:50]
             total_records = len(data_list)
             logging.info(f"Loaded {total_records} records")
