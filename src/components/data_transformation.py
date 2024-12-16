@@ -63,39 +63,34 @@ class DataTransformation:
             target_column = str(target_columns)
             columnname = list(columnsname)
             data = data.dropna(subset=[target_column])
-            
-            # Apply the word preprocessing function
-            # data["cleaned_text"] = data[target_column].apply(word_preprocess)
-            # data = process_dataframe(df=data,text_column=target_column)
-            
-            # mapping = pd.Series(state_df['State'].values, index=state_df['Abbreviation']).to_dict()
-            
-            # li = ['keywords', 'stopwords']
-            # data['full_Statename'] = data['State'].map(mapping)
-            # li.extend([c for c in columnsname])
-        
+            data = data.dropna(axis=1, how='all')
+
+            col_data = data.columns
+            print(col_data)
+            filtered_column_list = [col for col in columnname if col in col_data]
+
+            print(filtered_column_list)
             logging.info(
                 f"Applying preposcessing object on data"
             )
 
             # process_columns = columnsname
-            preprocessing_obj = self.get_data_transformation_object(col_name=columnname)
+            preprocessing_obj = self.get_data_transformation_object(col_name=filtered_column_list)
             target_feature_train_df = preprocessing_obj.fit_transform(data)
         
-            transformed_df = pd.DataFrame(target_feature_train_df,columns=columnname[:len(target_feature_train_df[0])])
+            transformed_df = pd.DataFrame(target_feature_train_df,columns=filtered_column_list[:len(target_feature_train_df[0])])
             
             logging.info(f"Applying preposcessing object on data")
 
             # transformed_df['date'] = data['Date'].values
              
             artifact_file_path = self.data_transformation_config.preprocessor_obj_file_path_excel
-            transformed_df.to_excel(artifact_file_path, index=False,columns=columnname)
+            transformed_df.to_excel(artifact_file_path, index=False,columns=filtered_column_list)
             # train_arr = np.c_[
             #      np.array(target_feature_train_df)
             # ]
             
             return self.data_transformation_config.preprocessor_obj_file_path_excel
-        
 
         except Exception as e:
             logging.error(e,"Error in Data loading")
