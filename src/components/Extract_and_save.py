@@ -61,13 +61,13 @@ class Relation_extraction:
             # If extraction fails, return an empty dict
             if extracted_data is None:
                 logging.warning("No data extracted. Returning empty dictionary.")
-                return {}
+                return None
             
             return extracted_data
         except Exception as e:
             logging.error(f"LLM response error: {e}")
             # Return empty dict instead of raising exception
-            return {}
+            return None
         
    
 
@@ -85,20 +85,27 @@ class Relation_extraction:
             
             extracted_data = await self.get_llm_response(system_prompt, text)
             
+            # Check if LLM returned data
+            if not extracted_data:
+                logging.error(f"No response from LLM for record: {record}")
+                return None
+
             # Merge original record with extracted data
             updated_record = record.copy()
-            
+
             # Only update if extracted_data is not empty
             if extracted_data:
                 updated_record.update(extracted_data)
-
+            
+            
             return updated_record
+        
         except Exception as e:
             # logging.error(f"Error in record extraction or database insert: {e}")
             # return record # If we don't want empty list of extracted record remove return
-            error_message = f"Error in record extraction: {str(e)}"
-            logging.error(error_message)
-            return {"error": error_message}
+            # error_message = f"Error in record extraction: {str(e)}"
+            logging.error(f"Error in record extraction: {str(e)}")
+            return None
 
     async def load_and_extract(self, data_path: str, target_column: str, batch_size: int = 50):
         try:

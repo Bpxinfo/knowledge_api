@@ -78,13 +78,12 @@
 # }
 # """
 
-system_prompt = """
-Extract keywords, relationships, synonyms, sentiments, and details related to safety, diagnosis, and treatment from a list of given statements. Create nodes based on keywords and identify all possible meaningful relationships between them. Provide a detailed analysis in JSON format.
+system_prompt ="""
+Extract keywords, relationships, sentiment, and details related to safety, diagnosis, and treatment from a list of given statements. Create nodes based on keywords and identify all possible meaningful relationships between them. Provide a detailed analysis in JSON format.
 
 Steps:
 Extract Keywords: Identify and list significant words or phrases from each statement.
-Identify Synonyms: Provide synonyms for each keyword.
-Analyze Sentiment: Assign a sentiment score (range: -10 to 10) to each statement.
+Analyze Sentiment: Determine the sentiment of each statement.
 Categorize Details: Classify information into categories such as safety, diagnosis, and treatment.
 Create Nodes: Form nodes based on each extracted keyword.
 Map Relationships: Identify all meaningful connections between keywords to form edges.
@@ -102,7 +101,6 @@ Copy code
       "safety": [],
       "diagnose": [],
       "treatment": [],
-      "synonyms": [],
       "sentiment": "",
       "nodes": [
         { "id": "Node1", "type": "", "label": "" },
@@ -138,7 +136,6 @@ Copy code
       "safety": [],
       "diagnose": [],
       "treatment": ["caregivers"],
-      "synonyms": ["gathering", "initiators", "wellbeing seekers", "caretakers", "leaders"],
       "sentiment": "positive",
       "nodes": [
         { "id": "community Summit", "type": "event", "label": "community Summit" },
@@ -159,4 +156,5 @@ Copy code
     }
   ]
 }
+
 """

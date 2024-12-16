@@ -188,7 +188,7 @@ def extract_medical_lists(text):
         'edges': result.get('edges', []) or result.get('Edges', []),
         'AnalyzeThoroughly': [result.get('AnalyzeThoroughly', '')],
         'Issue': result.get('ISSUE', []),
-        'synonyms': result.get('synonyms', {})
+        # 'synonyms': result.get('synonyms', {})
     }
     
     return medical_lists

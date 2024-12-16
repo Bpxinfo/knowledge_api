@@ -5,6 +5,7 @@ import asyncio
 import logging
 import aiohttp
 import aiomysql
+import pandas as pd
 from dotenv import load_dotenv
 
 # Ensure these are imported correctly from your project structure
@@ -12,9 +13,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','..'
 from src.exception import CustomException
 from src.logger import logging
 from src.db.insert_create_table import check_table_exists, create_tables_dynamically
-from src.db.insert_create_table import sanitize_sheetname
+from src.db.insert_create_table import get_sql_type,sanitize_sheetname
 # Load environment variables
 load_dotenv()
+
+
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -123,7 +126,7 @@ class load_into_db:
                                 k: v for k, v in record.items() 
                                 if k not in ['nodes', 'edges', 'Theme', 'Safety', 'Treatment', 
                                             'Diagnosis', 'sentiment', 'AnalyzeThoroughly', 'Issue', 
-                                            'keywords', 'stopwords', 'synonyms']
+                                            'keywords', 'stopwords', ]
                             }
 
                             # Add sheet_name_id to feedback_data
@@ -131,7 +134,7 @@ class load_into_db:
 
                             # Convert lists to JSON strings for fields
                             list_fields = ['Theme', 'Safety', 'Treatment', 'Diagnosis', 
-                                        'sentiment', 'AnalyzeThoroughly', 'keywords', 'synonyms', 'Tags']
+                                        'sentiment', 'AnalyzeThoroughly', 'keywords', 'Tags']
                             for field in list_fields:
 
                                 field_data = record.get(field, [])
@@ -148,7 +151,17 @@ class load_into_db:
                                     # If it's not a list, store as a JSON string
                                     feedback_data[field] = json.dumps(field_data) if field_data else None
 
-                            feedback_data['Issue'] = record.get('Issue')
+                            # feedback_data['Issue'] = record.get('Issue')
+                            issue_data = record.get('Issue')
+
+                            # Check if 'Issue' is a list
+                            if isinstance(issue_data, list):
+                                # Join list items into a comma-separated string if not empty
+                                feedback_data['Issue'] = ",".join(issue_data) if issue_data else None
+                            else:
+                                # Store the value directly if it's not a list
+                                feedback_data['Issue'] = issue_data
+
                             feedback_data['Stopwords'] = record.get('stopwords')
 
                             # Construct and execute the insert query for feedback data
@@ -226,20 +239,22 @@ class load_into_db:
 
 
 
-    async def load_and_database(self, data_path: str, sheet_name: str, metadata: str, source_col, batch_size: int = 50):
+    async def load_and_database(self, data_path: str, sheet_name: str, metadata: str, source_col, batch_size: int = 25):
         try:
-  
             # Read input data
             with open(data_path, 'r', encoding='utf-8') as json_file:
                 data_list = json.load(json_file)
 
-            data_list = data_list[:10]
+            # if not isinstance(data_list, list):
+            #     raise ValueError("Loaded data is not a list.")
+
+            data_list = data_list[:50]
             total_records = len(data_list)
             logging.info(f"Loaded {total_records} records")
 
             # Handle case when batch_size is greater than total records
             batch_size = min(batch_size, total_records)
-       
+            
             # Check and create table if not exists
             if not check_table_exists(sheetname=sheet_name):      
                 create_tables_dynamically(json_data=data_list[0], sheetname=sheet_name)
@@ -255,11 +270,10 @@ class load_into_db:
             total_failed = 0
 
             for i in range(0, total_records, batch_size):
-
                 batch = data_list[i:i+batch_size]
-                
+
                 logging.info(f"Processing batch {i//batch_size + 1}: Records {i} to {min(i+batch_size, total_records)}")
-                
+
                 # Create batch insertion tasks
                 insertion_tasks = [
                     self.insert_record(record, sheet_name_id, sanitized_sheetname)
@@ -278,42 +292,41 @@ class load_into_db:
                             'error': str(result)
                         })
                         total_failed += 1
-                        logging.error(f"Failed to insert record: {result}")
+                        logging.error(f"Failed to insert record: {e}")
                     elif result is not None:
                         # Successful insertion
                         processed_records.append(result)
                         total_successful += 1
 
-                # Optional: Log batch progress
                 logging.info(f"Batch {i//batch_size + 1} completed. " 
                             f"Successful: {total_successful}, Failed: {total_failed}")
 
-                # Prepare and return comprehensive results
-                results = {
-                    'total_records': total_records,
-                    'processed_records': processed_records,
-                    'failed_records': failed_records,
-                    'total_successful': total_successful,
-                    'total_failed': total_failed
-                }
+            # Prepare and return comprehensive results
+            results = {
+                'total_records': total_records,
+                'processed_records': processed_records,
+                'failed_records': failed_records,
+                'total_successful': total_successful,
+                'total_failed': total_failed
+            }
 
-                logging.info(f"Batch processing complete. "
-                            f"Total Records: {total_records}, "
-                            f"Successful: {total_successful}, "
-                            f"Failed: {total_failed}")
+            logging.info(f"Batch processing complete. "
+                        f"Total Records: {total_records}, "
+                        f"Successful: {total_successful}, "
+                        f"Failed: {total_failed}")
 
-                return results
+            return results
 
         except Exception as e:
             logging.error(f"Batch processing error: {e}")
-            raise
+            
 
 # async def main():
 
 #     # Configuration
 #     data_path = r"C:\Users\nickc\OneDrive\Desktop\New folder (2)\Backend\artifact\Relation.json"
 #     target_column = "Feedback/Quotes From Stakeholders"
-#     sheet_name = "demo table"
+#     sheet_name = "2024 feedback"
 #     source_cal ={
 #     "col_Date":"Date",
 #     "State":"State",
