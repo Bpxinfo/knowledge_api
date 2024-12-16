@@ -86,7 +86,7 @@ class DataTransformation:
             
             logging.info(f"Applying preposcessing object on data")
 
-            transformed_df['date'] = data['Date'].values
+            # transformed_df['date'] = data['Date'].values
              
             artifact_file_path = self.data_transformation_config.preprocessor_obj_file_path_excel
             transformed_df.to_excel(artifact_file_path, index=False,columns=columnname)
